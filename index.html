@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jadwal Sholat Pintar</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#27ae60">
+    <style>
+        :root { --primary: #27ae60; --dark: #2c3e50; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f3; display: flex; justify-content: center; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; }
+        #countdown-box { background: var(--primary); color: white; padding: 20px; border-radius: 15px; margin-bottom: 25px; }
+        #timer { font-size: 2em; font-weight: bold; margin-top: 5px; letter-spacing: 2px; }
+        #next-prayer-name { font-size: 1.1em; opacity: 0.9; }
+        .sholat-item { display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px solid #eee; transition: 0.3s; border-radius: 10px; }
+        .sholat-item.active { background: #eafaf1; color: var(--primary); border-bottom: none; transform: scale(1.02); font-weight: bold; }
+        .loading { color: #7f8c8d; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div id="countdown-box">
+        <div id="next-prayer-name">Mencari Jadwal...</div>
+        <div id="timer">00:00:00</div>
+    </div>
+    <div id="times-list"><p class="loading">Mengakses lokasi Anda...</p></div>
+</div>
+
+<script>
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+    }
+
+    let prayerTimes = {};
+    const namesMap = { 'Fajr': 'Subuh', 'Dhuhr': 'Dzuhur', 'Asr': 'Ashar', 'Maghrib': 'Maghrib', 'Isha': 'Isya' };
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            await getPrayerData(latitude, longitude);
+            startCountdown();
+        }, () => { document.getElementById('next-prayer-name').innerText = "Akses Lokasi Ditolak"; });
+    }
+
+    async function getPrayerData(lat, lon) {
+        try {
+            const res = await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=11`);
+            const data = await res.json();
+            prayerTimes = data.data.timings;
+            renderList();
+        } catch (e) { console.log("Gagal ambil data"); }
+    }
+
+    function renderList() {
+        const container = document.getElementById('times-list');
+        container.innerHTML = '';
+        ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].forEach(key => {
+            container.innerHTML += `<div class="sholat-item" id="item-${key}"><span>${namesMap[key]}</span><span>${prayerTimes[key]}</span></div>`;
+        });
+    }
+
+    function startCountdown() {
+        setInterval(() => {
+            const now = new Date();
+            let next = null; let nextName = '';
+            const list = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+            for (let key of list) {
+                const [h, m] = prayerTimes[key].split(':');
+                const pTime = new Date(); pTime.setHours(h, m, 0);
+                if (pTime > now) { next = pTime; nextName = key; break; }
+            }
+            if (!next) {
+                const [h, m] = prayerTimes['Fajr'].split(':');
+                next = new Date(); next.setDate(next.getDate() + 1); next.setHours(h, m, 0); nextName = 'Fajr';
+            }
+            const diff = next - now;
+            const hours = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            document.getElementById('timer').innerText = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            document.getElementById('next-prayer-name').innerText = `Menuju ${namesMap[nextName]}`;
+            document.querySelectorAll('.sholat-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`item-${nextName}`).classList.add('active');
+        }, 1000);
+    }
+</script>
+</body>
+</html>
