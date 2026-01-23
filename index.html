@@ -3,25 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jadwal Sholat Pintar</title>
+    <title>Jadwal Sholat Akurat</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#27ae60">
     <style>
         :root { --primary: #27ae60; --dark: #2c3e50; --bg: #f0f4f3; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; min-height: 100vh; align-items: center; }
         .card { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        
-        /* Header & Search */
         .search-box { display: flex; gap: 5px; margin-bottom: 15px; }
         .search-box input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 10px; outline: none; }
         .search-box button { padding: 10px; background: var(--primary); color: white; border: none; border-radius: 10px; cursor: pointer; }
-
         #countdown-box { background: var(--primary); color: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; }
         #timer { font-size: 2.5em; font-weight: bold; }
-        
         .location-info h3 { margin: 0; color: var(--dark); }
         .location-info small { color: #7f8c8d; }
-
         .audio-control { display: flex; align-items: center; justify-content: center; gap: 10px; background: #f8f9fa; padding: 10px; border-radius: 50px; margin: 15px 0; border: 1px solid #eee; }
         .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -29,7 +24,6 @@
         input:checked + .slider { background-color: var(--primary); }
         .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider:before { transform: translateX(22px); }
-
         .sholat-item { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid #f1f1f1; border-radius: 10px; }
         .sholat-item.active { background: #eafaf1; color: var(--primary); font-weight: bold; transform: scale(1.02); border-bottom: none; }
     </style>
@@ -80,11 +74,10 @@
         document.getElementById('sound-status').innerText = isSoundEnabled ? "🔊 Suara Aktif" : "🔇 Suara Mati";
         if(isSoundEnabled) { 
             const p = document.getElementById('adhan-player');
-            p.play().then(() => { p.pause(); p.currentTime = 0; });
+            p.play().then(() => { p.pause(); p.currentTime = 0; }).catch(() => {});
         }
     });
 
-    // Ambil Lokasi GPS Otomatis
     function initApp() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -101,7 +94,6 @@
         startCountdown();
     }
 
-    // Fungsi Cari Manual
     async function searchCity() {
         const query = document.getElementById('input-city').value;
         if(!query) return;
@@ -123,9 +115,20 @@
     }
 
     async function getPrayerData(lat, lon) {
-        const res = await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=20`);
+        // Menggunakan method 20 (Kemenag RI) dan tune parameter untuk akurasi ekstra
+        const res = await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=20&school=1`);
         const data = await res.json();
-        prayerTimes = data.data.timings;
+        const rawTimes = data.data.timings;
+        
+        // Koreksi manual Ihtiyati (+2 menit) agar sama dengan Google/Masjid
+        const list = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+        list.forEach(key => {
+            let [h, m] = rawTimes[key].split(':').map(Number);
+            let date = new Date();
+            date.setHours(h, m + 2); // Menambah 2 menit pengaman
+            prayerTimes[key] = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        });
+
         document.getElementById('date-display').innerText = data.data.date.readable;
         renderList();
     }
@@ -162,7 +165,8 @@
             document.getElementById('next-prayer-name').innerText = `Menuju ${namesMap[nextKey]}`;
             
             document.querySelectorAll('.sholat-item').forEach(e => e.classList.remove('active'));
-            document.getElementById(`item-${nextKey}`).classList.add('active');
+            const activeEl = document.getElementById(`item-${nextKey}`);
+            if(activeEl) activeEl.classList.add('active');
 
             if(prayerTimes[nextKey] === timeStr && lastPlayed !== nextKey && isSoundEnabled) {
                 document.getElementById('adhan-player').play();
