@@ -3,88 +3,352 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jadwal Sholat Akurat</title>
+    <title>Jadwal Sholat Pintar</title>
+    
+    <!-- PWA Meta Tags -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#27ae60">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <style>
-        :root { --primary: #27ae60; --dark: #2c3e50; --bg: #f0f4f3; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; min-height: 100vh; align-items: center; }
-        .card { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        .search-box { display: flex; gap: 5px; margin-bottom: 15px; }
-        .search-box input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 10px; outline: none; }
-        .search-box button { padding: 10px; background: var(--primary); color: white; border: none; border-radius: 10px; cursor: pointer; }
-        #countdown-box { background: var(--primary); color: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; }
-        #timer { font-size: 2.5em; font-weight: bold; }
-        .location-info h3 { margin: 0; color: var(--dark); }
-        .location-info small { color: #7f8c8d; }
-        .audio-control { display: flex; align-items: center; justify-content: center; gap: 10px; background: #f8f9fa; padding: 10px; border-radius: 50px; margin: 15px 0; border: 1px solid #eee; }
-        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-        input:checked + .slider { background-color: var(--primary); }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider:before { transform: translateX(22px); }
-        .sholat-item { display: flex; justify-content: space-between; padding: 12px 15px; border-bottom: 1px solid #f1f1f1; border-radius: 10px; }
-        .sholat-item.active { background: #eafaf1; color: var(--primary); font-weight: bold; transform: scale(1.02); border-bottom: none; }
+        :root {
+            --primary: #27ae60;
+            --primary-light: #eafaf1;
+            --dark: #2c3e50;
+            --gray: #7f8c8d;
+            --bg: #f0f4f3;
+            --white: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+
+        .card {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        /* Search Box */
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1.5px solid #eee;
+            border-radius: 15px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary);
+        }
+
+        .search-box button {
+            padding: 0 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        .search-box button:active {
+            opacity: 0.8;
+        }
+
+        /* Countdown Area */
+        #countdown-box {
+            background: var(--primary);
+            color: var(--white);
+            padding: 25px 20px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            box-shadow: 0 10px 20px rgba(39, 174, 96, 0.2);
+        }
+
+        #next-prayer-name {
+            font-size: 1.1em;
+            font-weight: 500;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.9;
+        }
+
+        #timer {
+            font-size: 3em;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Info Lokasi */
+        .location-info {
+            margin-bottom: 20px;
+        }
+
+        #city-display {
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        #date-display {
+            display: block;
+            margin-top: 5px;
+            color: var(--gray);
+            font-size: 0.9em;
+        }
+
+        /* Sound Control */
+        .audio-control {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 12px 20px;
+            border-radius: 50px;
+            margin-bottom: 25px;
+            border: 1px solid #f0f0f0;
+        }
+
+        #sound-status {
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Prayer Schedule List */
+        .schedule-container {
+            text-align: left;
+        }
+
+        .sholat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 18px;
+            margin-bottom: 10px;
+            border-radius: 15px;
+            background: #fdfdfd;
+            border: 1px solid #f1f1f1;
+            transition: all 0.3s ease;
+        }
+
+        .sholat-item span:first-child {
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+
+        .sholat-item span:last-child {
+            font-weight: 700;
+            font-family: monospace;
+            font-size: 1.1em;
+        }
+
+        .sholat-item.active {
+            background: var(--primary-light);
+            color: var(--primary);
+            border-color: var(--primary);
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.1);
+        }
+
+        .loading-text {
+            color: var(--gray);
+            font-style: italic;
+            padding: 20px;
+        }
+
+        /* Responsive */
+        @media (max-height: 700px) {
+            .card { padding: 15px; }
+            #timer { font-size: 2.5em; }
+            .sholat-item { padding: 10px 15px; }
+        }
     </style>
 </head>
 <body>
 
 <div class="card">
+    <!-- Pencarian Manual -->
     <div class="search-box">
-        <input type="text" id="input-city" placeholder="Ketik nama kota (ex: Majenang)">
+        <input type="text" id="input-city" placeholder="Cari kota (mis: Majenang)...">
         <button onclick="searchCity()">Cari</button>
     </div>
 
+    <!-- Countdown Utama -->
     <div id="countdown-box">
-        <div id="next-prayer-name">Mencari Jadwal...</div>
+        <div id="next-prayer-name">Mendeteksi...</div>
         <div id="timer">00:00:00</div>
     </div>
 
+    <!-- Info Lokasi & Tanggal -->
     <div class="location-info">
-        <h3 id="city-display">Mendeteksi Lokasi...</h3>
-        <small id="date-display"></small>
+        <h3 id="city-display">Mencari Lokasi...</h3>
+        <small id="date-display">-- --- ----</small>
     </div>
 
+    <!-- Kontrol Suara -->
     <div class="audio-control">
-        <span id="sound-status" style="font-size: 0.85em;">🔇 Suara Mati</span>
+        <span id="sound-status">🔇 Suara Mati</span>
         <label class="switch">
             <input type="checkbox" id="toggle-sound">
             <span class="slider"></span>
         </label>
     </div>
 
-    <div id="times-list"></div>
+    <!-- Daftar Jadwal Sholat -->
+    <div id="times-list" class="schedule-container">
+        <div class="loading-text">Menunggu izin lokasi...</div>
+    </div>
 </div>
 
-<audio id="adhan-player" src="https://www.islamcan.com/common/adhan/adhan1.mp3"></audio>
+<!-- Audio Adzan -->
+<audio id="adhan-player" src="https://www.islamcan.com/common/adhan/adhan1.mp3" preload="auto"></audio>
 
 <script>
+    // --- State & Konfigurasi ---
     let prayerTimes = {};
     let isSoundEnabled = false;
     let lastPlayed = "";
-    const namesMap = { 'Fajr': 'Subuh', 'Dhuhr': 'Dzuhur', 'Asr': 'Ashar', 'Maghrib': 'Maghrib', 'Isha': 'Isya' };
+    const namesMap = { 
+        'Fajr': 'Subuh', 
+        'Dhuhr': 'Dzuhur', 
+        'Asr': 'Ashar', 
+        'Maghrib': 'Maghrib', 
+        'Isha': 'Isya' 
+    };
 
-    // Registrasi PWA
-    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+    // --- Inisialisasi PWA Service Worker ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(err => console.error("SW fail:", err));
+        });
+    }
 
-    // Toggle Suara
-    document.getElementById('toggle-sound').addEventListener('change', function() {
+    // --- UI Elements ---
+    const soundToggle = document.getElementById('toggle-sound');
+    const soundStatus = document.getElementById('sound-status');
+    const adhanPlayer = document.getElementById('adhan-player');
+    const cityDisplay = document.getElementById('city-display');
+    const dateDisplay = document.getElementById('date-display');
+    const timerDisplay = document.getElementById('timer');
+    const nextNameDisplay = document.getElementById('next-prayer-name');
+    const timesList = document.getElementById('times-list');
+
+    // --- Logika Suara ---
+    soundToggle.addEventListener('change', function() {
         isSoundEnabled = this.checked;
-        document.getElementById('sound-status').innerText = isSoundEnabled ? "🔊 Suara Aktif" : "🔇 Suara Mati";
-        if(isSoundEnabled) { 
-            const p = document.getElementById('adhan-player');
-            p.play().then(() => { p.pause(); p.currentTime = 0; }).catch(() => {});
+        soundStatus.innerText = isSoundEnabled ? "🔊 Suara Aktif" : "🔇 Suara Mati";
+        
+        if (isSoundEnabled) {
+            // Pancing izin audio (wajib di browser modern)
+            const playPromise = adhanPlayer.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    adhanPlayer.pause();
+                    adhanPlayer.currentTime = 0;
+                }).catch(e => console.log("Audio unlock failed:", e));
+            }
+        } else {
+            adhanPlayer.pause();
+            adhanPlayer.currentTime = 0;
         }
     });
 
+    // --- Logika Lokasi ---
     function initApp() {
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                updateByCoords(pos.coords.latitude, pos.coords.longitude);
-            }, () => {
-                document.getElementById('city-display').innerText = "Gunakan Pencarian Manual";
-            }, { enableHighAccuracy: true });
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    updateByCoords(pos.coords.latitude, pos.coords.longitude);
+                }, 
+                (err) => {
+                    cityDisplay.innerText = "Gunakan Cari Manual";
+                    console.warn("GPS Access Denied/Error");
+                }, 
+                options
+            );
+        } else {
+            cityDisplay.innerText = "GPS Tidak Didukung";
         }
     }
 
@@ -95,87 +359,143 @@
     }
 
     async function searchCity() {
-        const query = document.getElementById('input-city').value;
-        if(!query) return;
-        document.getElementById('city-display').innerText = "Mencari...";
+        const query = document.getElementById('input-city').value.trim();
+        if (!query) return;
+
+        cityDisplay.innerText = "Mencari...";
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`);
             const data = await res.json();
-            if(data.length > 0) {
+            if (data && data.length > 0) {
                 updateByCoords(data[0].lat, data[0].lon);
-            } else { alert("Kota tidak ditemukan"); }
-        } catch (e) { alert("Error mencari kota"); }
+            } else {
+                alert("Kota tidak ditemukan!");
+                cityDisplay.innerText = "Lokasi Tidak Ditemukan";
+            }
+        } catch (e) {
+            alert("Terjadi kesalahan koneksi saat mencari kota.");
+        }
     }
 
     async function getCityName(lat, lon) {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
-        const data = await res.json();
-        const addr = data.address;
-        document.getElementById('city-display').innerText = addr.town || addr.city || addr.suburb || addr.village || "Lokasi Anda";
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+            const data = await res.json();
+            const addr = data.address;
+            // Prioritas: Nama kecamatan (town/suburb) atau kota
+            const locName = addr.town || addr.suburb || addr.city || addr.village || addr.county || "Lokasi Anda";
+            cityDisplay.innerText = locName;
+        } catch (e) {
+            cityDisplay.innerText = "Lokasi Terdeteksi";
+        }
     }
 
+    // --- Logika Jadwal Sholat ---
     async function getPrayerData(lat, lon) {
-        // Menggunakan method 20 (Kemenag RI) dan tune parameter untuk akurasi ekstra
-        const res = await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=20&school=1`);
-        const data = await res.json();
-        const rawTimes = data.data.timings;
-        
-        // Koreksi manual Ihtiyati (+2 menit) agar sama dengan Google/Masjid
-        const list = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-        list.forEach(key => {
-            let [h, m] = rawTimes[key].split(':').map(Number);
-            let date = new Date();
-            date.setHours(h, m + 2); // Menambah 2 menit pengaman
-            prayerTimes[key] = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-        });
+        try {
+            // method=20: Kemenag RI
+            // school=0: Syafi'i (Ashar Normal)
+            const res = await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=20&school=0`);
+            const data = await res.json();
+            const apiTimings = data.data.timings;
+            
+            // Terapkan Ihtiyati (Waktu Pengaman +2 Menit) agar sesuai standar lokal
+            const keys = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+            keys.forEach(key => {
+                let [h, m] = apiTimings[key].split(':').map(Number);
+                let d = new Date();
+                d.setHours(h, m + 2, 0); // Menambah 2 menit
+                prayerTimes[key] = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            });
 
-        document.getElementById('date-display').innerText = data.data.date.readable;
-        renderList();
+            dateDisplay.innerText = data.data.date.readable;
+            renderScheduleList();
+        } catch (e) {
+            timesList.innerHTML = "<div class='loading-text'>Gagal memuat jadwal. Periksa koneksi Anda.</div>";
+        }
     }
 
-    function renderList() {
-        const container = document.getElementById('times-list');
-        container.innerHTML = '';
+    function renderScheduleList() {
+        timesList.innerHTML = '';
         ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].forEach(key => {
-            container.innerHTML += `<div class="sholat-item" id="item-${key}"><span>${namesMap[key]}</span><span>${prayerTimes[key]}</span></div>`;
+            const item = document.createElement('div');
+            item.className = 'sholat-item';
+            item.id = `item-${key}`;
+            item.innerHTML = `<span>${namesMap[key]}</span><span>${prayerTimes[key]}</span>`;
+            timesList.appendChild(item);
         });
     }
 
+    // --- Logika Countdown & Real-time Check ---
     function startCountdown() {
-        if(window.timerInterval) clearInterval(window.timerInterval);
+        if (window.timerInterval) clearInterval(window.timerInterval);
+
         window.timerInterval = setInterval(() => {
             const now = new Date();
-            const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-            let next = null; let nextKey = '';
+            const timeNowStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            let next = null;
+            let nextKey = '';
             const list = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
+            // Cari jadwal mendatang hari ini
             for (let k of list) {
                 const [h, m] = prayerTimes[k].split(':');
-                const p = new Date(); p.setHours(h, m, 0);
-                if (p > now) { next = p; nextKey = k; break; }
+                const pDate = new Date();
+                pDate.setHours(h, m, 0);
+                if (pDate > now) {
+                    next = pDate;
+                    nextKey = k;
+                    break;
+                }
             }
-            if(!next) {
+
+            // Jika semua sudah lewat, target adalah Subuh besok
+            if (!next) {
                 const [h, m] = prayerTimes['Fajr'].split(':');
-                next = new Date(); next.setDate(next.getDate()+1); next.setHours(h, m, 0); nextKey = 'Fajr';
+                next = new Date();
+                next.setDate(next.getDate() + 1);
+                next.setHours(h, m, 0);
+                nextKey = 'Fajr';
             }
 
+            // Hitung Selisih
             const diff = next - now;
-            const hh = Math.floor(diff/3600000); const mm = Math.floor((diff%3600000)/60000); const ss = Math.floor((diff%60000)/1000);
-            document.getElementById('timer').innerText = `${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`;
-            document.getElementById('next-prayer-name').innerText = `Menuju ${namesMap[nextKey]}`;
-            
-            document.querySelectorAll('.sholat-item').forEach(e => e.classList.remove('active'));
-            const activeEl = document.getElementById(`item-${nextKey}`);
-            if(activeEl) activeEl.classList.add('active');
+            const hh = Math.floor(diff / 3600000);
+            const mm = Math.floor((diff % 3600000) / 60000);
+            const ss = Math.floor((diff % 60000) / 1000);
 
-            if(prayerTimes[nextKey] === timeStr && lastPlayed !== nextKey && isSoundEnabled) {
-                document.getElementById('adhan-player').play();
-                lastPlayed = nextKey;
+            // Update UI
+            timerDisplay.innerText = `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+            nextNameDisplay.innerText = `Menuju ${namesMap[nextKey]}`;
+            
+            // Highlight Baris Aktif
+            document.querySelectorAll('.sholat-item').forEach(el => el.classList.remove('active'));
+            const activeRow = document.getElementById(`item-${nextKey}`);
+            if (activeRow) activeRow.classList.add('active');
+
+            // Cek Putar Adzan
+            // Cari apakah waktu sekarang tepat sama dengan salah satu jadwal
+            list.forEach(k => {
+                if (prayerTimes[k] === timeNowStr && lastPlayed !== k) {
+                    if (isSoundEnabled) {
+                        adhanPlayer.play();
+                        lastPlayed = k;
+                    }
+                }
+            });
+
+            // Reset marker jika sudah lewat menit adzan
+            if (!list.map(k => prayerTimes[k]).includes(timeNowStr)) {
+                lastPlayed = "";
             }
+
         }, 1000);
     }
 
+    // Jalankan Aplikasi
     initApp();
 </script>
+
 </body>
 </html>
