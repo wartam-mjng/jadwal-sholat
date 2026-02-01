@@ -135,7 +135,7 @@
             background: #f8f9fa;
             padding: 12px 20px;
             border-radius: 50px;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
             border: 1px solid #f0f0f0;
         }
 
@@ -184,17 +184,6 @@
 
         input:checked + .slider:before {
             transform: translateX(22px);
-        }
-
-        .test-sound-btn {
-            background: none;
-            border: none;
-            color: var(--primary);
-            font-size: 0.8em;
-            cursor: pointer;
-            text-decoration: underline;
-            margin-bottom: 15px;
-            display: inline-block;
         }
 
         /* Prayer Schedule List */
@@ -287,8 +276,6 @@
             <span class="slider"></span>
         </label>
     </div>
-    
-    <button class="test-sound-btn" onclick="testAdhan()">Coba Putar Suara</button>
 
     <div id="times-list" class="schedule-container">
         <div class="loading-text">Menunggu data lokasi...</div>
@@ -325,23 +312,12 @@
     const nextNameDisplay = document.getElementById('next-prayer-name');
     const timesList = document.getElementById('times-list');
 
-    function testAdhan() {
-        if(!isSoundEnabled) {
-            alert("Harap aktifkan tombol suara di atas terlebih dahulu.");
-            return;
-        }
-        adhanPlayer.currentTime = 0;
-        adhanPlayer.play().catch(e => {
-            console.error(e);
-            alert("Gagal memutar suara.");
-        });
-    }
-
     soundToggle.addEventListener('change', function() {
         isSoundEnabled = this.checked;
         soundStatus.innerText = isSoundEnabled ? "🔊 Suara Aktif" : "🔇 Suara Mati";
         
         if (isSoundEnabled) {
+            // Membuka blokir audio pada browser
             adhanPlayer.play().then(() => {
                 adhanPlayer.pause();
                 adhanPlayer.currentTime = 0;
@@ -394,12 +370,10 @@
 
     async function getCityName(lat, lon) {
         try {
-            // Menambahkan zoom=18 agar API memberikan hasil sedetail mungkin
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
             const data = await res.json();
             const addr = data.address;
             
-            // Urutan prioritas: Desa -> Kelurahan -> Kecamatan -> Kota
             const specificLoc = addr.village || addr.suburb || addr.hamlet || addr.neighborhood || addr.town || addr.city_district || addr.city || "Lokasi Anda";
             const district = addr.city_district || addr.municipality || "";
             
