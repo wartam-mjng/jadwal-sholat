@@ -138,7 +138,7 @@
             background: #f8f9fa;
             padding: 12px 20px;
             border-radius: 50px;
-            margin-bottom: 25px;
+            margin-bottom: 10px;
             border: 1px solid #f0f0f0;
         }
 
@@ -189,6 +189,17 @@
             transform: translateX(22px);
         }
 
+        .test-sound-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 0.8em;
+            cursor: pointer;
+            text-decoration: underline;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+
         /* Prayer Schedule List */
         .schedule-container {
             text-align: left;
@@ -231,36 +242,47 @@
             padding: 20px;
         }
 
+        /* --- FOOTER --- */
+        .footer {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px solid #f0f0f0;
+            color: var(--gray);
+            font-size: 0.8em;
+            letter-spacing: 0.5px;
+        }
+
+        .footer strong {
+            color: var(--primary);
+        }
+
         /* Responsive */
         @media (max-height: 700px) {
             .card { padding: 15px; }
             #timer { font-size: 2.5em; }
             .sholat-item { padding: 10px 15px; }
+            .footer { margin-top: 15px; }
         }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <!-- Pencarian Manual -->
     <div class="search-box">
-        <input type="text" id="input-city" placeholder="Cari kota (mis: Majenang)...">
+        <input type="text" id="input-city" placeholder="Cari kota (mis: Jakarta)...">
         <button onclick="searchCity()">Cari</button>
     </div>
 
-    <!-- Countdown Utama -->
     <div id="countdown-box">
         <div id="next-prayer-name">Mendeteksi...</div>
         <div id="timer">00:00:00</div>
     </div>
 
-    <!-- Info Lokasi & Tanggal -->
     <div class="location-info">
         <h3 id="city-display">Mencari Lokasi...</h3>
         <small id="date-display">-- --- ----</small>
     </div>
 
-    <!-- Kontrol Suara -->
     <div class="audio-control">
         <span id="sound-status">🔇 Suara Mati</span>
         <label class="switch">
@@ -268,18 +290,27 @@
             <span class="slider"></span>
         </label>
     </div>
+    
+    <button class="test-sound-btn" onclick="testAdhan()">Coba Putar Suara</button>
 
-    <!-- Daftar Jadwal Sholat -->
     <div id="times-list" class="schedule-container">
         <div class="loading-text">Menunggu izin lokasi...</div>
     </div>
+
+    <div class="footer">
+        Dibuat dengan ❤️ oleh <strong>Wartam</strong>
+    </div>
 </div>
 
-<!-- Audio Adzan -->
-<audio id="adhan-player" src="https://www.islamcan.com/common/adhan/adhan1.mp3" preload="auto"></audio>
+<!-- Audio Player dengan Link Google Drive yang diperbarui -->
+<audio id="adhan-player" preload="auto" crossorigin="anonymous">
+    <!-- Menggunakan format Direct Download dari ID file Google Drive yang Anda berikan -->
+    <source src="https://docs.google.com/uc?export=download&id=17E6SPWlpxEjmcaS4qzO4rYsJ3CnVAnKb" type="audio/mpeg">
+    <!-- Fallback jika link Drive gagal -->
+    <source src="https://www.islamcan.com/common/adhan/adhan1.mp3" type="audio/mpeg">
+</audio>
 
 <script>
-    // --- State & Konfigurasi ---
     let prayerTimes = {};
     let isSoundEnabled = false;
     let lastPlayed = "";
@@ -291,14 +322,6 @@
         'Isha': 'Isya' 
     };
 
-    // --- Inisialisasi PWA Service Worker ---
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').catch(err => console.error("SW fail:", err));
-        });
-    }
-
-    // --- UI Elements ---
     const soundToggle = document.getElementById('toggle-sound');
     const soundStatus = document.getElementById('sound-status');
     const adhanPlayer = document.getElementById('adhan-player');
@@ -308,47 +331,51 @@
     const nextNameDisplay = document.getElementById('next-prayer-name');
     const timesList = document.getElementById('times-list');
 
-    // --- Logika Suara ---
+    // Fungsi Test Suara
+    function testAdhan() {
+        if(!isSoundEnabled) {
+            alert("Harap aktifkan tombol suara di atas terlebih dahulu.");
+            return;
+        }
+        adhanPlayer.currentTime = 0;
+        adhanPlayer.play().catch(e => {
+            console.error(e);
+            alert("Gagal memutar suara. Pastikan file Google Drive diatur ke 'Publik' atau gunakan browser lain.");
+        });
+    }
+
     soundToggle.addEventListener('change', function() {
         isSoundEnabled = this.checked;
         soundStatus.innerText = isSoundEnabled ? "🔊 Suara Aktif" : "🔇 Suara Mati";
         
         if (isSoundEnabled) {
-            // Pancing izin audio (wajib di browser modern)
-            const playPromise = adhanPlayer.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    adhanPlayer.pause();
-                    adhanPlayer.currentTime = 0;
-                }).catch(e => console.log("Audio unlock failed:", e));
-            }
+            // Melakukan "warm up" audio untuk bypass kebijakan browser
+            adhanPlayer.play().then(() => {
+                adhanPlayer.pause();
+                adhanPlayer.currentTime = 0;
+            }).catch(e => {
+                console.error("Audio unlock failed:", e);
+            });
         } else {
             adhanPlayer.pause();
             adhanPlayer.currentTime = 0;
         }
     });
 
-    // --- Logika Lokasi ---
     function initApp() {
         if (navigator.geolocation) {
-            const options = {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            };
-
             navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                    updateByCoords(pos.coords.latitude, pos.coords.longitude);
+                (pos) => updateByCoords(pos.coords.latitude, pos.coords.longitude), 
+                () => {
+                    cityDisplay.innerText = "Lokasi tidak diizinkan";
+                    // Default Jakarta jika GPS gagal
+                    updateByCoords(-6.2088, 106.8456);
                 }, 
-                (err) => {
-                    cityDisplay.innerText = "Gunakan Cari Manual";
-                    console.warn("GPS Access Denied/Error");
-                }, 
-                options
+                { enableHighAccuracy: true, timeout: 10000 }
             );
         } else {
             cityDisplay.innerText = "GPS Tidak Didukung";
+            updateByCoords(-6.2088, 106.8456);
         }
     }
 
@@ -361,20 +388,13 @@
     async function searchCity() {
         const query = document.getElementById('input-city').value.trim();
         if (!query) return;
-
         cityDisplay.innerText = "Mencari...";
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`);
             const data = await res.json();
-            if (data && data.length > 0) {
-                updateByCoords(data[0].lat, data[0].lon);
-            } else {
-                alert("Kota tidak ditemukan!");
-                cityDisplay.innerText = "Lokasi Tidak Ditemukan";
-            }
-        } catch (e) {
-            alert("Terjadi kesalahan koneksi saat mencari kota.");
-        }
+            if (data?.length > 0) updateByCoords(data[0].lat, data[0].lon);
+            else alert("Kota tidak ditemukan!");
+        } catch (e) { alert("Masalah koneksi internet."); }
     }
 
     async function getCityName(lat, lon) {
@@ -382,37 +402,23 @@
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
             const data = await res.json();
             const addr = data.address;
-            // Prioritas: Nama kecamatan (town/suburb) atau kota
-            const locName = addr.town || addr.suburb || addr.city || addr.village || addr.county || "Lokasi Anda";
-            cityDisplay.innerText = locName;
-        } catch (e) {
-            cityDisplay.innerText = "Lokasi Terdeteksi";
-        }
+            cityDisplay.innerText = addr.city || addr.town || addr.suburb || "Lokasi Anda";
+        } catch (e) { cityDisplay.innerText = "Lokasi Terdeteksi"; }
     }
 
-    // --- Logika Jadwal Sholat ---
     async function getPrayerData(lat, lon) {
         try {
-            // method=20: Kemenag RI
-            // school=0: Syafi'i (Ashar Normal)
-            const res = await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=20&school=0`);
+            const res = await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=20`);
             const data = await res.json();
             const apiTimings = data.data.timings;
             
-            // Terapkan Ihtiyati (Waktu Pengaman +2 Menit) agar sesuai standar lokal
-            const keys = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-            keys.forEach(key => {
-                let [h, m] = apiTimings[key].split(':').map(Number);
-                let d = new Date();
-                d.setHours(h, m + 2, 0); // Menambah 2 menit
-                prayerTimes[key] = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].forEach(key => {
+                prayerTimes[key] = apiTimings[key];
             });
 
             dateDisplay.innerText = data.data.date.readable;
             renderScheduleList();
-        } catch (e) {
-            timesList.innerHTML = "<div class='loading-text'>Gagal memuat jadwal. Periksa koneksi Anda.</div>";
-        }
+        } catch (e) { timesList.innerHTML = "Gagal memuat data jadwal sholat."; }
     }
 
     function renderScheduleList() {
@@ -426,7 +432,6 @@
         });
     }
 
-    // --- Logika Countdown & Real-time Check ---
     function startCountdown() {
         if (window.timerInterval) clearInterval(window.timerInterval);
 
@@ -438,8 +443,8 @@
             let nextKey = '';
             const list = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
-            // Cari jadwal mendatang hari ini
             for (let k of list) {
+                if (!prayerTimes[k]) continue;
                 const [h, m] = prayerTimes[k].split(':');
                 const pDate = new Date();
                 pDate.setHours(h, m, 0);
@@ -450,8 +455,7 @@
                 }
             }
 
-            // Jika semua sudah lewat, target adalah Subuh besok
-            if (!next) {
+            if (!next && prayerTimes['Fajr']) {
                 const [h, m] = prayerTimes['Fajr'].split(':');
                 next = new Date();
                 next.setDate(next.getDate() + 1);
@@ -459,33 +463,31 @@
                 nextKey = 'Fajr';
             }
 
-            // Hitung Selisih
-            const diff = next - now;
-            const hh = Math.floor(diff / 3600000);
-            const mm = Math.floor((diff % 3600000) / 60000);
-            const ss = Math.floor((diff % 60000) / 1000);
-
-            // Update UI
-            timerDisplay.innerText = `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
-            nextNameDisplay.innerText = `Menuju ${namesMap[nextKey]}`;
+            if (next) {
+                const diff = next - now;
+                const hh = Math.floor(diff / 3600000);
+                const mm = Math.floor((diff % 3600000) / 60000);
+                const ss = Math.floor((diff % 60000) / 1000);
+                timerDisplay.innerText = `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+                nextNameDisplay.innerText = `Menuju ${namesMap[nextKey]}`;
+            }
             
-            // Highlight Baris Aktif
             document.querySelectorAll('.sholat-item').forEach(el => el.classList.remove('active'));
             const activeRow = document.getElementById(`item-${nextKey}`);
             if (activeRow) activeRow.classList.add('active');
 
-            // Cek Putar Adzan
-            // Cari apakah waktu sekarang tepat sama dengan salah satu jadwal
+            // Cek Waktu Sholat Tiba
             list.forEach(k => {
                 if (prayerTimes[k] === timeNowStr && lastPlayed !== k) {
                     if (isSoundEnabled) {
-                        adhanPlayer.play();
+                        adhanPlayer.currentTime = 0;
+                        adhanPlayer.play().catch(e => console.log("Autoplay ditolak browser:", e));
                         lastPlayed = k;
                     }
                 }
             });
 
-            // Reset marker jika sudah lewat menit adzan
+            // Reset kunci played jika menit sudah lewat
             if (!list.map(k => prayerTimes[k]).includes(timeNowStr)) {
                 lastPlayed = "";
             }
@@ -493,7 +495,6 @@
         }, 1000);
     }
 
-    // Jalankan Aplikasi
     initApp();
 </script>
 
