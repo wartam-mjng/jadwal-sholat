@@ -81,10 +81,6 @@
             transition: opacity 0.2s;
         }
 
-        .search-box button:active {
-            opacity: 0.8;
-        }
-
         /* Countdown Area */
         #countdown-box {
             background: var(--primary);
@@ -118,9 +114,10 @@
 
         #city-display {
             margin: 0;
-            font-size: 1.5em;
+            font-size: 1.4em;
             font-weight: 700;
             color: var(--dark);
+            line-height: 1.3;
         }
 
         #date-display {
@@ -274,12 +271,12 @@
     </div>
 
     <div id="countdown-box">
-        <div id="next-prayer-name">Mendeteksi...</div>
+        <div id="next-prayer-name">Mendeteksi GPS...</div>
         <div id="timer">00:00:00</div>
     </div>
 
     <div class="location-info">
-        <h3 id="city-display">Mencari Lokasi...</h3>
+        <h3 id="city-display">Mencari Detail Desa...</h3>
         <small id="date-display">-- --- ----</small>
     </div>
 
@@ -294,7 +291,7 @@
     <button class="test-sound-btn" onclick="testAdhan()">Coba Putar Suara</button>
 
     <div id="times-list" class="schedule-container">
-        <div class="loading-text">Menunggu izin lokasi...</div>
+        <div class="loading-text">Menunggu data lokasi...</div>
     </div>
 
     <div class="footer">
@@ -302,11 +299,8 @@
     </div>
 </div>
 
-<!-- Audio Player dengan Link Google Drive yang diperbarui -->
 <audio id="adhan-player" preload="auto" crossorigin="anonymous">
-    <!-- Menggunakan format Direct Download dari ID file Google Drive yang Anda berikan -->
     <source src="https://docs.google.com/uc?export=download&id=17E6SPWlpxEjmcaS4qzO4rYsJ3CnVAnKb" type="audio/mpeg">
-    <!-- Fallback jika link Drive gagal -->
     <source src="https://www.islamcan.com/common/adhan/adhan1.mp3" type="audio/mpeg">
 </audio>
 
@@ -331,7 +325,6 @@
     const nextNameDisplay = document.getElementById('next-prayer-name');
     const timesList = document.getElementById('times-list');
 
-    // Fungsi Test Suara
     function testAdhan() {
         if(!isSoundEnabled) {
             alert("Harap aktifkan tombol suara di atas terlebih dahulu.");
@@ -340,7 +333,7 @@
         adhanPlayer.currentTime = 0;
         adhanPlayer.play().catch(e => {
             console.error(e);
-            alert("Gagal memutar suara. Pastikan file Google Drive diatur ke 'Publik' atau gunakan browser lain.");
+            alert("Gagal memutar suara.");
         });
     }
 
@@ -349,13 +342,10 @@
         soundStatus.innerText = isSoundEnabled ? "🔊 Suara Aktif" : "🔇 Suara Mati";
         
         if (isSoundEnabled) {
-            // Melakukan "warm up" audio untuk bypass kebijakan browser
             adhanPlayer.play().then(() => {
                 adhanPlayer.pause();
                 adhanPlayer.currentTime = 0;
-            }).catch(e => {
-                console.error("Audio unlock failed:", e);
-            });
+            }).catch(e => console.error("Audio unlock failed:", e));
         } else {
             adhanPlayer.pause();
             adhanPlayer.currentTime = 0;
@@ -365,11 +355,13 @@
     function initApp() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-                (pos) => updateByCoords(pos.coords.latitude, pos.coords.longitude), 
-                () => {
-                    cityDisplay.innerText = "Lokasi tidak diizinkan";
-                    // Default Jakarta jika GPS gagal
-                    updateByCoords(-6.2088, 106.8456);
+                (pos) => {
+                    updateByCoords(pos.coords.latitude, pos.coords.longitude);
+                }, 
+                (err) => {
+                    console.warn("Geolocation error:", err.message);
+                    cityDisplay.innerText = "GPS Ditolak/Gagal";
+                    updateByCoords(-6.2088, 106.8456); // Jakarta Default
                 }, 
                 { enableHighAccuracy: true, timeout: 10000 }
             );
@@ -390,20 +382,31 @@
         if (!query) return;
         cityDisplay.innerText = "Mencari...";
         try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`);
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&addressdetails=1`);
             const data = await res.json();
-            if (data?.length > 0) updateByCoords(data[0].lat, data[0].lon);
-            else alert("Kota tidak ditemukan!");
-        } catch (e) { alert("Masalah koneksi internet."); }
+            if (data?.length > 0) {
+                updateByCoords(data[0].lat, data[0].lon);
+            } else {
+                alert("Lokasi tidak ditemukan!");
+            }
+        } catch (e) { alert("Masalah koneksi."); }
     }
 
     async function getCityName(lat, lon) {
         try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+            // Menambahkan zoom=18 agar API memberikan hasil sedetail mungkin
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
             const data = await res.json();
             const addr = data.address;
-            cityDisplay.innerText = addr.city || addr.town || addr.suburb || "Lokasi Anda";
-        } catch (e) { cityDisplay.innerText = "Lokasi Terdeteksi"; }
+            
+            // Urutan prioritas: Desa -> Kelurahan -> Kecamatan -> Kota
+            const specificLoc = addr.village || addr.suburb || addr.hamlet || addr.neighborhood || addr.town || addr.city_district || addr.city || "Lokasi Anda";
+            const district = addr.city_district || addr.municipality || "";
+            
+            cityDisplay.innerText = district && district !== specificLoc ? `${specificLoc}, ${district}` : specificLoc;
+        } catch (e) { 
+            cityDisplay.innerText = "Lokasi Terdeteksi"; 
+        }
     }
 
     async function getPrayerData(lat, lon) {
@@ -418,7 +421,9 @@
 
             dateDisplay.innerText = data.data.date.readable;
             renderScheduleList();
-        } catch (e) { timesList.innerHTML = "Gagal memuat data jadwal sholat."; }
+        } catch (e) { 
+            timesList.innerHTML = "Gagal memuat jadwal."; 
+        }
     }
 
     function renderScheduleList() {
@@ -476,7 +481,6 @@
             const activeRow = document.getElementById(`item-${nextKey}`);
             if (activeRow) activeRow.classList.add('active');
 
-            // Cek Waktu Sholat Tiba
             list.forEach(k => {
                 if (prayerTimes[k] === timeNowStr && lastPlayed !== k) {
                     if (isSoundEnabled) {
@@ -487,7 +491,6 @@
                 }
             });
 
-            // Reset kunci played jika menit sudah lewat
             if (!list.map(k => prayerTimes[k]).includes(timeNowStr)) {
                 lastPlayed = "";
             }
